@@ -14,7 +14,6 @@ import (
 	"time"
 
 	arwenConfig "github.com/ElrondNetwork/arwen-wasm-vm/v1_4/config"
-	"github.com/ElrondNetwork/elrond-go-core/core/check"
 	"github.com/ElrondNetwork/elrond-go-core/data"
 	dataBlock "github.com/ElrondNetwork/elrond-go-core/data/block"
 	"github.com/ElrondNetwork/elrond-go-core/data/transaction"
@@ -1129,13 +1128,12 @@ func CreateNodesWithFullGenesis(
 	nodes := make([]*TestProcessorNode, nodesPerShard)
 	connectableNodes := make([]Connectable, len(nodes))
 
-	hardforkStarter := createGenesisNode(genesisFile, nil)
+	hardforkStarter := createGenesisNode(genesisFile)
 
 	idx := 0
 	for j := 0; j < nodesPerShard; j++ {
 		nodes[idx] = createGenesisNode(
 			genesisFile,
-			hardforkStarter.NodeKeys.Pk,
 		)
 		connectableNodes[idx] = nodes[idx]
 		idx++
@@ -1149,7 +1147,6 @@ func CreateNodesWithFullGenesis(
 
 func createGenesisNode(
 	genesisFile string,
-	hardforkPk crypto.PublicKey,
 ) *TestProcessorNode {
 	accountParser := &genesisMocks.AccountsParserStub{}
 	smartContractParser, _ := parsing.NewSmartContractsParser(
@@ -1158,18 +1155,9 @@ func createGenesisNode(
 		&mock.KeyGenMock{},
 	)
 
-	strPk := ""
-	if !check.IfNil(hardforkPk) {
-		buff, err := hardforkPk.ToByteArray()
-		log.LogIfError(err)
-
-		strPk = hex.EncodeToString(buff)
-	}
-
 	return NewTestProcessorNodeWithFullGenesis(
 		accountParser,
 		smartContractParser,
-		strPk,
 	)
 }
 
