@@ -50,13 +50,11 @@ import (
 	"github.com/ElrondNetwork/elrond-go/state/storagePruningManager/evictionWaitingList"
 	"github.com/ElrondNetwork/elrond-go/storage"
 	"github.com/ElrondNetwork/elrond-go/storage/memorydb"
-	"github.com/ElrondNetwork/elrond-go/storage/pruning"
 	"github.com/ElrondNetwork/elrond-go/storage/storageUnit"
 	"github.com/ElrondNetwork/elrond-go/testscommon"
 	dataRetrieverMock "github.com/ElrondNetwork/elrond-go/testscommon/dataRetriever"
 	"github.com/ElrondNetwork/elrond-go/testscommon/genesisMocks"
 	"github.com/ElrondNetwork/elrond-go/testscommon/p2pmocks"
-	testStorage "github.com/ElrondNetwork/elrond-go/testscommon/state"
 	statusHandlerMock "github.com/ElrondNetwork/elrond-go/testscommon/statusHandler"
 	"github.com/ElrondNetwork/elrond-go/trie"
 	"github.com/ElrondNetwork/elrond-go/trie/hashesHolder"
@@ -133,54 +131,6 @@ func createP2PConfig(initialPeerList []string) config.P2PConfig {
 			Type: p2p.NilListSharder,
 		},
 	}
-}
-
-// CreateMessengerWithKadDht creates a new libp2p messenger with kad-dht peer discovery
-func CreateMessengerWithKadDht(initialAddr string) p2p.Messenger {
-	initialAddresses := make([]string, 0)
-	if len(initialAddr) > 0 {
-		initialAddresses = append(initialAddresses, initialAddr)
-	}
-	arg := libp2p.ArgsNetworkMessenger{
-		Marshalizer:           TestMarshalizer,
-		ListenAddress:         libp2p.ListenLocalhostAddrWithIp4AndTcp,
-		P2pConfig:             createP2PConfig(initialAddresses),
-		SyncTimer:             &libp2p.LocalSyncTimer{},
-		PreferredPeersHolder:  &p2pmocks.PeersHolderStub{},
-		NodeOperationMode:     p2p.NormalOperation,
-		PeersRatingHandler:    &p2pmocks.PeersRatingHandlerStub{},
-		ConnectionWatcherType: p2p.ConnectionWatcherTypePrint,
-	}
-
-	libP2PMes, err := libp2p.NewNetworkMessenger(arg)
-	log.LogIfError(err)
-
-	return libP2PMes
-}
-
-// CreateMessengerWithKadDhtAndProtocolID creates a new libp2p messenger with kad-dht peer discovery and peer ID
-func CreateMessengerWithKadDhtAndProtocolID(initialAddr string, protocolID string) p2p.Messenger {
-	initialAddresses := make([]string, 0)
-	if len(initialAddr) > 0 {
-		initialAddresses = append(initialAddresses, initialAddr)
-	}
-	p2pConfig := createP2PConfig(initialAddresses)
-	p2pConfig.KadDhtPeerDiscovery.ProtocolID = protocolID
-	arg := libp2p.ArgsNetworkMessenger{
-		Marshalizer:           TestMarshalizer,
-		ListenAddress:         libp2p.ListenLocalhostAddrWithIp4AndTcp,
-		P2pConfig:             p2pConfig,
-		SyncTimer:             &libp2p.LocalSyncTimer{},
-		PreferredPeersHolder:  &p2pmocks.PeersHolderStub{},
-		NodeOperationMode:     p2p.NormalOperation,
-		PeersRatingHandler:    &p2pmocks.PeersRatingHandlerStub{},
-		ConnectionWatcherType: p2p.ConnectionWatcherTypePrint,
-	}
-
-	libP2PMes, err := libp2p.NewNetworkMessenger(arg)
-	log.LogIfError(err)
-
-	return libP2PMes
 }
 
 // CreateMessengerFromConfig creates a new libp2p messenger with provided configuration
@@ -272,58 +222,6 @@ func CreateMessengerWithNoDiscoveryAndPeersRatingHandler(peersRatingHanlder p2p.
 	return CreateMessengerFromConfigWithPeersRatingHandler(p2pConfig, peersRatingHanlder)
 }
 
-// CreateFixedNetworkOf8Peers assembles a network as following:
-//
-//                             0------------------- 1
-//                             |                    |
-//        2 ------------------ 3 ------------------ 4
-//        |                    |                    |
-//        5                    6                    7
-func CreateFixedNetworkOf8Peers() ([]p2p.Messenger, error) {
-	peers := createMessengersWithNoDiscovery(8)
-
-	connections := map[int][]int{
-		0: {1, 3},
-		1: {4},
-		2: {5, 3},
-		3: {4, 6},
-		4: {7},
-	}
-
-	err := createConnections(peers, connections)
-	if err != nil {
-		return nil, err
-	}
-
-	return peers, nil
-}
-
-// CreateFixedNetworkOf14Peers assembles a network as following:
-//
-//                 0
-//                 |
-//                 1
-//                 |
-//  +--+--+--+--+--2--+--+--+--+--+
-//  |  |  |  |  |  |  |  |  |  |  |
-//  3  4  5  6  7  8  9  10 11 12 13
-func CreateFixedNetworkOf14Peers() ([]p2p.Messenger, error) {
-	peers := createMessengersWithNoDiscovery(14)
-
-	connections := map[int][]int{
-		0: {1},
-		1: {2},
-		2: {3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13},
-	}
-
-	err := createConnections(peers, connections)
-	if err != nil {
-		return nil, err
-	}
-
-	return peers, nil
-}
-
 func createMessengersWithNoDiscovery(numPeers int) []p2p.Messenger {
 	peers := make([]p2p.Messenger, numPeers)
 
@@ -399,36 +297,6 @@ func CreateStore(numOfShards uint32) dataRetriever.StorageService {
 	return store
 }
 
-// CreateTrieStorageManagerWithPruningStorer creates the trie storage manager for the tests
-func CreateTrieStorageManagerWithPruningStorer(coordinator sharding.Coordinator, notifier pruning.EpochStartNotifier) common.StorageManager {
-	generalCfg := config.TrieStorageManagerConfig{
-		PruningBufferLen:      1000,
-		SnapshotsBufferLen:    10,
-		SnapshotsGoroutineNum: 1,
-	}
-
-	mainStorer, _, err := testStorage.CreateTestingTriePruningStorer(coordinator, notifier)
-	if err != nil {
-		fmt.Println("err creating main storer" + err.Error())
-	}
-	checkpointsStorer, _, err := testStorage.CreateTestingTriePruningStorer(coordinator, notifier)
-	if err != nil {
-		fmt.Println("err creating checkpoints storer" + err.Error())
-	}
-	args := trie.NewTrieStorageManagerArgs{
-		MainStorer:             mainStorer,
-		CheckpointsStorer:      checkpointsStorer,
-		Marshalizer:            TestMarshalizer,
-		Hasher:                 TestHasher,
-		GeneralConfig:          generalCfg,
-		CheckpointHashesHolder: hashesHolder.NewCheckpointHashesHolder(10000000, uint64(TestHasher.Size())),
-		IdleProvider:           &testscommon.ProcessStatusHandlerStub{},
-	}
-	trieStorageManager, _ := trie.NewTrieStorageManager(args)
-
-	return trieStorageManager
-}
-
 // CreateTrieStorageManager creates the trie storage manager for the tests
 func CreateTrieStorageManager(store storage.Storer) (common.StorageManager, storage.Storer) {
 	generalCfg := config.TrieStorageManagerConfig{
@@ -497,7 +365,7 @@ func CreateShardChain() data.ChainHandler {
 }
 
 // CreateSimpleGenesisBlocks creates empty genesis blocks for all known shards
-func CreateSimpleGenesisBlocks(shardCoordinator sharding.Coordinator) map[uint32]data.HeaderHandler {
+func CreateSimpleGenesisBlocks() map[uint32]data.HeaderHandler {
 	genesisBlocks := make(map[uint32]data.HeaderHandler)
 	genesisBlocks[0] = CreateSimpleGenesisBlock()
 
