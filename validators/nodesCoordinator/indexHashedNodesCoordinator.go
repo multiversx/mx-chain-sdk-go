@@ -3,6 +3,7 @@ package nodesCoordinator
 import (
 	"bytes"
 	"fmt"
+	"github.com/ElrondNetwork/elrond-go/state"
 	"github.com/pkg/errors"
 	"sync"
 
@@ -130,6 +131,7 @@ func (i *indexHashedNodesCoordinator) setNodeType(isValidator bool) {
 func (i *indexHashedNodesCoordinator) ComputeConsensusGroup(
 	randomness []byte,
 	round uint64,
+	_, _ uint32,
 ) (validatorsGroup []nodesCoordinator.Validator, err error) {
 	log.Trace("computing consensus group for",
 		"randomness", randomness,
@@ -145,7 +147,7 @@ func (i *indexHashedNodesCoordinator) ComputeConsensusGroup(
 		return validators, nil
 	}
 
-	consensusSize := i.ConsensusGroupSize()
+	consensusSize := i.ConsensusGroupSize(0)
 	randomness = []byte(fmt.Sprintf("%d-%s", round, randomness))
 
 	log.Trace("computeValidatorsGroup",
@@ -180,18 +182,18 @@ func (i *indexHashedNodesCoordinator) searchConsensusForKey(key []byte) []nodesC
 }
 
 // GetValidatorWithPublicKey gets the validator with the given public key
-func (i *indexHashedNodesCoordinator) GetValidatorWithPublicKey(publicKey []byte) (nodesCoordinator.Validator, error) {
+func (i *indexHashedNodesCoordinator) GetValidatorWithPublicKey(publicKey []byte) (nodesCoordinator.Validator, uint32, error) {
 	if len(publicKey) == 0 {
-		return nil, ErrNilPubKey
+		return nil, 0, ErrNilPubKey
 	}
 	i.mutNodesConfig.RLock()
 	v, ok := i.publicKeyToValidatorMap[string(publicKey)]
 	i.mutNodesConfig.RUnlock()
 	if ok {
-		return v, nil
+		return v, 0, nil
 	}
 
-	return nil, ErrValidatorNotFound
+	return nil, 0, ErrValidatorNotFound
 }
 
 // GetConsensusValidatorsPublicKeys calculates the validators consensus group for a specific shard, randomness and round number,
@@ -199,8 +201,9 @@ func (i *indexHashedNodesCoordinator) GetValidatorWithPublicKey(publicKey []byte
 func (i *indexHashedNodesCoordinator) GetConsensusValidatorsPublicKeys(
 	randomness []byte,
 	round uint64,
+	_, _ uint32,
 ) ([]string, error) {
-	consensusNodes, err := i.ComputeConsensusGroup(randomness, round)
+	consensusNodes, err := i.ComputeConsensusGroup(randomness, round, 0, 0)
 	if err != nil {
 		return nil, err
 	}
@@ -214,13 +217,29 @@ func (i *indexHashedNodesCoordinator) GetConsensusValidatorsPublicKeys(
 	return pubKeys, nil
 }
 
+// GetConsensusWhitelistedNodes will return the current whitelisted nodes
+func (i *indexHashedNodesCoordinator) GetConsensusWhitelistedNodes(_ uint32) (map[string]struct{}, error) {
+	publicKeysNewEpoch, errGetEligible := i.GetAllEligibleValidatorsPublicKeys(0)
+	if errGetEligible != nil {
+		return nil, errGetEligible
+	}
+
+	eligible := make(map[string]struct{})
+	for _, pubKey := range publicKeysNewEpoch[0] {
+		eligible[string(pubKey)] = struct{}{}
+	}
+
+	return eligible, nil
+}
+
 // GetAllEligibleValidatorsPublicKeys will return all validators public keys
-func (i *indexHashedNodesCoordinator) GetAllEligibleValidatorsPublicKeys() ([][]byte, error) {
-	validatorsPubKeys := make([][]byte, 0)
+func (i *indexHashedNodesCoordinator) GetAllEligibleValidatorsPublicKeys(_ uint32) (map[uint32][][]byte, error) {
+	validatorsPubKeys := make(map[uint32][][]byte)
 
 	i.mutNodesConfig.RLock()
-	for _, node := range i.eligibleNodes {
-		validatorsPubKeys = append(validatorsPubKeys, node.PubKey())
+	validatorsPubKeys[0] = make([][]byte, len(i.eligibleNodes))
+	for idx, node := range i.eligibleNodes {
+		validatorsPubKeys[0][idx] = node.PubKey()
 	}
 	i.mutNodesConfig.RUnlock()
 
@@ -230,16 +249,17 @@ func (i *indexHashedNodesCoordinator) GetAllEligibleValidatorsPublicKeys() ([][]
 // GetValidatorsIndexes will return validators indexes for a block
 func (i *indexHashedNodesCoordinator) GetValidatorsIndexes(
 	publicKeys []string,
+	_ uint32,
 ) ([]uint64, error) {
 	signersIndexes := make([]uint64, 0)
 
-	validatorsPubKeys, err := i.GetAllEligibleValidatorsPublicKeys()
+	validatorsPubKeys, err := i.GetAllEligibleValidatorsPublicKeys(0)
 	if err != nil {
 		return nil, err
 	}
 
 	for _, pubKey := range publicKeys {
-		for index, value := range validatorsPubKeys {
+		for index, value := range validatorsPubKeys[0] {
 			if bytes.Equal([]byte(pubKey), value) {
 				signersIndexes = append(signersIndexes, uint64(index))
 			}
@@ -248,7 +268,7 @@ func (i *indexHashedNodesCoordinator) GetValidatorsIndexes(
 
 	if len(publicKeys) != len(signersIndexes) {
 		strHaving := "having the following keys: \n"
-		for index, value := range validatorsPubKeys {
+		for index, value := range validatorsPubKeys[0] {
 			strHaving += fmt.Sprintf(" index %d  key %s\n", index, logger.DisplayByteSlice(value))
 		}
 
@@ -347,7 +367,7 @@ func (i *indexHashedNodesCoordinator) NotifyOrder() uint32 {
 }
 
 // ConsensusGroupSize returns the consensus group size for a specific shard
-func (i *indexHashedNodesCoordinator) ConsensusGroupSize() int {
+func (i *indexHashedNodesCoordinator) ConsensusGroupSize(_ uint32) int {
 	return i.consensusGroupSize
 }
 
@@ -359,6 +379,40 @@ func (i *indexHashedNodesCoordinator) GetNumTotalEligible() uint64 {
 // GetOwnPublicKey will return current node public key  for block sign
 func (i *indexHashedNodesCoordinator) GetOwnPublicKey() []byte {
 	return i.selfPubKey
+}
+
+// GetAllWaitingValidatorsPublicKeys returns empty - as it is not used
+func (i *indexHashedNodesCoordinator) GetAllWaitingValidatorsPublicKeys(_ uint32) (map[uint32][][]byte, error) {
+	return make(map[uint32][][]byte), nil
+}
+
+// GetAllLeavingValidatorsPublicKeys returns empty - as it is not used
+func (i *indexHashedNodesCoordinator) GetAllLeavingValidatorsPublicKeys(_ uint32) (map[uint32][][]byte, error) {
+	return make(map[uint32][][]byte), nil
+}
+
+// ComputeAdditionalLeaving returns empty
+func (i *indexHashedNodesCoordinator) ComputeAdditionalLeaving(_ []*state.ShardValidatorInfo) (map[uint32][]nodesCoordinator.Validator, error) {
+	return make(map[uint32][]nodesCoordinator.Validator), nil
+}
+
+// LoadState -
+func (i *indexHashedNodesCoordinator) LoadState(_ []byte) error {
+	return nil
+}
+
+// GetSavedStateKey -
+func (i *indexHashedNodesCoordinator) GetSavedStateKey() []byte {
+	return nil
+}
+
+// ShardIdForEpoch -
+func (i *indexHashedNodesCoordinator) ShardIdForEpoch(_ uint32) (uint32, error) {
+	return 0, nil
+}
+
+// ShuffleOutForEpoch -
+func (i *indexHashedNodesCoordinator) ShuffleOutForEpoch(_ uint32) {
 }
 
 // IsInterfaceNil returns true if there is no value under the interface
