@@ -3,7 +3,7 @@ package nodesCoordinator
 import (
 	"bytes"
 	"fmt"
-	"sort"
+	"github.com/pkg/errors"
 	"sync"
 
 	"github.com/ElrondNetwork/elrond-go-core/core"
@@ -16,26 +16,8 @@ import (
 )
 
 const (
-	keyFormat               = "%s_%v"
-	defaultSelectionChances = uint32(1)
+	keyFormat = "%s_%v"
 )
-
-type validatorList []nodesCoordinator.Validator
-
-// Len will return the length of the validatorList
-func (v validatorList) Len() int { return len(v) }
-
-// Swap will interchange the objects on input indexes
-func (v validatorList) Swap(i, j int) { v[i], v[j] = v[j], v[i] }
-
-// Less will return true if object on index i should appear before object in index j
-// Sorting of validators should be by index and public key
-func (v validatorList) Less(i, j int) bool {
-	if v[i].Index() == v[j].Index() {
-		return bytes.Compare(v[i].PubKey(), v[j].PubKey()) < 0
-	}
-	return v[i].Index() < v[j].Index()
-}
 
 // ArgNodesCoordinator holds all dependencies required by the nodes coordinator in order to create new instances
 type ArgNodesCoordinator struct {
@@ -286,39 +268,6 @@ func (i *indexHashedNodesCoordinator) GetValidatorsIndexes(
 	return signersIndexes, nil
 }
 
-func (i *indexHashedNodesCoordinator) createSortedList(validators []nodesCoordinator.Validator) []nodesCoordinator.Validator {
-	sortedList := make([]nodesCoordinator.Validator, 0)
-	sortedList = append(sortedList, validators...)
-
-	sort.Sort(validatorList(sortedList))
-	return sortedList
-}
-
-// NotifyOrder returns the notification order for a start of epoch event
-func (i *indexHashedNodesCoordinator) NotifyOrder() uint32 {
-	return common.NodesCoordinatorOrder
-}
-
-// ConsensusGroupSize returns the consensus group size for a specific shard
-func (i *indexHashedNodesCoordinator) ConsensusGroupSize() int {
-	return i.consensusGroupSize
-}
-
-// GetNumTotalEligible returns the number of total eligible accross all shards from current setup
-func (i *indexHashedNodesCoordinator) GetNumTotalEligible() uint64 {
-	return uint64(i.consensusGroupSize)
-}
-
-// GetOwnPublicKey will return current node public key  for block sign
-func (i *indexHashedNodesCoordinator) GetOwnPublicKey() []byte {
-	return i.selfPubKey
-}
-
-// IsInterfaceNil returns true if there is no value under the interface
-func (i *indexHashedNodesCoordinator) IsInterfaceNil() bool {
-	return i == nil
-}
-
 // GetChance returns the chance from an actual rating
 func (i *indexHashedNodesCoordinator) GetChance(rating uint32) uint32 {
 	return i.chanceComputer.GetChance(rating)
@@ -348,6 +297,8 @@ func (i *indexHashedNodesCoordinator) selectValidators(
 	}
 
 	i.mutNodesConfig.RLock()
+	defer i.mutNodesConfig.RUnlock()
+
 	selectedIndexes, err := i.selector.Select(randomness, uint32(i.consensusGroupSize))
 	if err != nil {
 		return nil, err
@@ -357,9 +308,60 @@ func (i *indexHashedNodesCoordinator) selectValidators(
 	for index := range consensusGroup {
 		consensusGroup[index] = i.eligibleNodes[selectedIndexes[index]]
 	}
-
-	i.mutNodesConfig.RUnlock()
 	displayValidatorsForRandomness(consensusGroup, randomness)
 
 	return consensusGroup, nil
+}
+
+// ReplaceNode is called by validatorAccountsDB when changes are happening on the validator list
+func (i *indexHashedNodesCoordinator) ReplaceNode(pubKeyToDelete []byte, newValidator nodesCoordinator.Validator) error {
+	i.mutNodesConfig.Lock()
+	defer i.mutNodesConfig.Unlock()
+
+	delete(i.publicKeyToValidatorMap, string(pubKeyToDelete))
+	i.publicKeyToValidatorMap[string(newValidator.PubKey())] = newValidator
+
+	replaced := false
+	for index, node := range i.eligibleNodes {
+		if bytes.Equal(node.PubKey(), pubKeyToDelete) {
+			replaced = true
+			i.eligibleNodes[index] = newValidator
+		}
+	}
+
+	if !replaced {
+		return errors.New("node with pubkey not found in eligible list")
+	}
+
+	err := i.createSelector()
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// NotifyOrder returns the notification order for a start of epoch event
+func (i *indexHashedNodesCoordinator) NotifyOrder() uint32 {
+	return common.NodesCoordinatorOrder
+}
+
+// ConsensusGroupSize returns the consensus group size for a specific shard
+func (i *indexHashedNodesCoordinator) ConsensusGroupSize() int {
+	return i.consensusGroupSize
+}
+
+// GetNumTotalEligible returns the number of total eligible accross all shards from current setup
+func (i *indexHashedNodesCoordinator) GetNumTotalEligible() uint64 {
+	return uint64(i.consensusGroupSize)
+}
+
+// GetOwnPublicKey will return current node public key  for block sign
+func (i *indexHashedNodesCoordinator) GetOwnPublicKey() []byte {
+	return i.selfPubKey
+}
+
+// IsInterfaceNil returns true if there is no value under the interface
+func (i *indexHashedNodesCoordinator) IsInterfaceNil() bool {
+	return i == nil
 }
