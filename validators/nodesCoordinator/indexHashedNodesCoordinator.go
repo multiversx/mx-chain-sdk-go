@@ -19,8 +19,8 @@ const (
 	keyFormat = "%s_%v"
 )
 
-// ArgNodesCoordinator holds all dependencies required by the nodes coordinator in order to create new instances
-type ArgNodesCoordinator struct {
+// ArgSingleShardNodesCoordinator holds all dependencies required by the nodes coordinator in order to create new instances
+type ArgSingleShardNodesCoordinator struct {
 	ConsensusGroupSize  int
 	Hasher              hashing.Hasher
 	EligibleNodes       []nodesCoordinator.Validator
@@ -45,8 +45,8 @@ type indexHashedNodesCoordinator struct {
 	publicKeyToValidatorMap map[string]nodesCoordinator.Validator
 }
 
-// NewIndexHashedNodesCoordinator creates a new index hashed group selector
-func NewIndexHashedNodesCoordinator(arguments ArgNodesCoordinator) (*indexHashedNodesCoordinator, error) {
+// NewSingleShardIndexHashedNodesCoordinator creates a new index hashed group selector
+func NewSingleShardIndexHashedNodesCoordinator(arguments ArgSingleShardNodesCoordinator) (*indexHashedNodesCoordinator, error) {
 	err := checkArguments(arguments)
 	if err != nil {
 		return nil, err
@@ -75,7 +75,7 @@ func NewIndexHashedNodesCoordinator(arguments ArgNodesCoordinator) (*indexHashed
 	return i, nil
 }
 
-func checkArguments(arguments ArgNodesCoordinator) error {
+func checkArguments(arguments ArgSingleShardNodesCoordinator) error {
 	if arguments.ConsensusGroupSize < 1 {
 		return ErrInvalidConsensusGroupSize
 	}
