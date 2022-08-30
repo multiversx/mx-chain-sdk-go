@@ -1,4 +1,4 @@
-package validators
+package setup
 
 import (
 	"fmt"
@@ -61,6 +61,14 @@ type NodesSetup struct {
 	eligible                 []nodesCoordinator.GenesisNodeInfoHandler
 	validatorPubkeyConverter core.PubkeyConverter
 	addressPubkeyConverter   core.PubkeyConverter
+}
+
+func (ns *NodesSetup) pubKeysListAsString() []string {
+	pubKeys := make([]string, len(ns.eligible))
+	for i, nodesInfo := range ns.eligible {
+		pubKeys[i] = string(nodesInfo.PubKeyBytes())
+	}
+	return pubKeys
 }
 
 // NewNodesSetup creates a new decoded nodes structure from json config file
@@ -154,18 +162,17 @@ func (ns *NodesSetup) createInitialNodesInfo() {
 }
 
 // InitialNodesPubKeys - gets initial nodes public keys
-func (ns *NodesSetup) InitialNodesPubKeys() []string {
-	pubKeys := make([]string, len(ns.eligible))
-	for i, nodesInfo := range ns.eligible {
-		pubKeys[i] = string(nodesInfo.PubKeyBytes())
-	}
-
-	return pubKeys
+func (ns *NodesSetup) InitialNodesPubKeys() map[uint32][]string {
+	mapPubKeys := make(map[uint32][]string)
+	mapPubKeys[0] = ns.pubKeysListAsString()
+	return mapPubKeys
 }
 
 // InitialNodesInfo - gets initial nodes info
-func (ns *NodesSetup) InitialNodesInfo() []nodesCoordinator.GenesisNodeInfoHandler {
-	return ns.eligible
+func (ns *NodesSetup) InitialNodesInfo() (map[uint32][]nodesCoordinator.GenesisNodeInfoHandler, map[uint32][]nodesCoordinator.GenesisNodeInfoHandler) {
+	eligibleMap := make(map[uint32][]nodesCoordinator.GenesisNodeInfoHandler)
+	eligibleMap[0] = ns.eligible
+	return eligibleMap, make(map[uint32][]nodesCoordinator.GenesisNodeInfoHandler)
 }
 
 // AllInitialNodes returns all initial nodes loaded
@@ -195,6 +202,61 @@ func (ns *NodesSetup) GetRoundDuration() uint64 {
 
 // GetConsensusGroupSize returns the shard consensus group size
 func (ns *NodesSetup) GetConsensusGroupSize() uint32 {
+	return ns.ConsensusGroupSize
+}
+
+// GetShardIDForPubKey -
+func (ns *NodesSetup) GetShardIDForPubKey(_ []byte) (uint32, error) {
+	return 0, nil
+}
+
+// InitialEligibleNodesPubKeysForShard -
+func (ns *NodesSetup) InitialEligibleNodesPubKeysForShard(_ uint32) ([]string, error) {
+	return ns.pubKeysListAsString(), nil
+}
+
+// InitialNodesInfoForShard -
+func (ns *NodesSetup) InitialNodesInfoForShard(_ uint32) ([]nodesCoordinator.GenesisNodeInfoHandler, []nodesCoordinator.GenesisNodeInfoHandler, error) {
+	return ns.eligible, make([]nodesCoordinator.GenesisNodeInfoHandler, 0), nil
+}
+
+// GetShardConsensusGroupSize -
+func (ns *NodesSetup) GetShardConsensusGroupSize() uint32 {
+	return ns.ConsensusGroupSize
+}
+
+// GetMetaConsensusGroupSize -
+func (ns *NodesSetup) GetMetaConsensusGroupSize() uint32 {
+	return ns.ConsensusGroupSize
+}
+
+// NumberOfShards -
+func (ns *NodesSetup) NumberOfShards() uint32 {
+	return 1
+}
+
+// MinNumberOfShardNodes -
+func (ns *NodesSetup) MinNumberOfShardNodes() uint32 {
+	return ns.ConsensusGroupSize
+}
+
+// MinNumberOfMetaNodes -
+func (ns *NodesSetup) MinNumberOfMetaNodes() uint32 {
+	return 0
+}
+
+// GetHysteresis -
+func (ns *NodesSetup) GetHysteresis() float32 {
+	return 0.0
+}
+
+// GetAdaptivity -
+func (ns *NodesSetup) GetAdaptivity() bool {
+	return false
+}
+
+// MinNumberOfNodesWithHysteresis -
+func (ns *NodesSetup) MinNumberOfNodesWithHysteresis() uint32 {
 	return ns.ConsensusGroupSize
 }
 

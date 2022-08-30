@@ -181,7 +181,7 @@ func CreateMessengerFromConfigWithPeersRatingHandler(p2pConfig config.P2PConfig,
 	return libP2PMes
 }
 
-// CreateP2PConfigWithNoDiscovery creates a new libp2p messenger with no peer discovery
+// CreateP2PConfigWithNoDiscovery creates a new libp2p messenger with no validator discovery
 func CreateP2PConfigWithNoDiscovery() config.P2PConfig {
 	return config.P2PConfig{
 		Node: config.NodeConfig{
@@ -197,14 +197,14 @@ func CreateP2PConfigWithNoDiscovery() config.P2PConfig {
 	}
 }
 
-// CreateMessengerWithNoDiscovery creates a new libp2p messenger with no peer discovery
+// CreateMessengerWithNoDiscovery creates a new libp2p messenger with no validator discovery
 func CreateMessengerWithNoDiscovery() p2p.Messenger {
 	p2pConfig := CreateP2PConfigWithNoDiscovery()
 
 	return CreateMessengerFromConfig(p2pConfig)
 }
 
-// CreateMessengerWithNoDiscoveryAndPeersRatingHandler creates a new libp2p messenger with no peer discovery
+// CreateMessengerWithNoDiscoveryAndPeersRatingHandler creates a new libp2p messenger with no validator discovery
 func CreateMessengerWithNoDiscoveryAndPeersRatingHandler(peersRatingHanlder p2p.PeersRatingHandler) p2p.Messenger {
 	p2pConfig := config.P2PConfig{
 		Node: config.NodeConfig{
@@ -1537,7 +1537,7 @@ func ProposeAndSyncOneBlock(
 // WaitForBootstrapAndShowConnected will delay a given duration in order to wait for bootstraping  and print the
 // number of peers that each node is connected to
 func WaitForBootstrapAndShowConnected(peers []p2p.Messenger, durationBootstrapingTime time.Duration) {
-	log.Info("Waiting for peer discovery...", "time", durationBootstrapingTime)
+	log.Info("Waiting for validator discovery...", "time", durationBootstrapingTime)
 	time.Sleep(durationBootstrapingTime)
 
 	strs := []string{"Connected peers:"}

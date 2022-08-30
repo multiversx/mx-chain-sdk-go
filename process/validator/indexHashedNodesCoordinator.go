@@ -1,4 +1,4 @@
-package nodesCoordinator
+package validator
 
 import (
 	"bytes"
