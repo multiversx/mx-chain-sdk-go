@@ -174,6 +174,9 @@ func (vs *validatorStatistics) SaveNodesCoordinatorUpdates(_ uint32) (bool, erro
 	return false, nil
 }
 
+// TODO: reuse validator statistics from elrond-go - rewrite that one to use another smaller interface which has all the necessary information
+// TODO: break it up to be able to use in single shard execution mode
+
 // UpdatePeerState takes a header, updates the validator state for all of the
 // consensus members and returns the new root hash
 func (vs *validatorStatistics) UpdatePeerState(header sidechaindata.SideChainHeaderHandler, previousHeader sidechaindata.SideChainHeaderHandler) ([]byte, error) {
