@@ -4,21 +4,14 @@ import (
 	"bytes"
 	"github.com/ElrondNetwork/chain-go-sdk/integrationTests"
 	"github.com/ElrondNetwork/elrond-go/process/block/preprocess"
-	"sync"
 	"time"
 
 	"github.com/ElrondNetwork/elrond-go-core/core"
-	"github.com/ElrondNetwork/elrond-go-core/core/atomic"
 	"github.com/ElrondNetwork/elrond-go-core/core/check"
 	"github.com/ElrondNetwork/elrond-go-core/data"
 	"github.com/ElrondNetwork/elrond-go-core/data/block"
-	"github.com/ElrondNetwork/elrond-go-core/hashing"
-	"github.com/ElrondNetwork/elrond-go-core/marshal"
 	logger "github.com/ElrondNetwork/elrond-go-logger"
-	"github.com/ElrondNetwork/elrond-go/dataRetriever"
 	"github.com/ElrondNetwork/elrond-go/process"
-	"github.com/ElrondNetwork/elrond-go/sharding"
-	"github.com/ElrondNetwork/elrond-go/state"
 	"github.com/ElrondNetwork/elrond-go/storage"
 )
 
@@ -27,172 +20,19 @@ var _ process.PreProcessor = (*transactions)(nil)
 
 var log = logger.GetOrCreate("process/block/preprocess")
 
-// 200% bandwidth to allow 100% overshooting estimations
-const selectionGasBandwidthIncreasePercent = 200
-
-// 130% to allow 30% overshooting estimations for scheduled SC calls
-const selectionGasBandwidthIncreaseScheduledPercent = 130
-
-type accountTxsShards struct {
-	accountsInfo map[string]*txShardInfo
-	sync.RWMutex
-}
-
 // TODO: increase code coverage with unit test
 
 type transactions struct {
-	*basePreProcess
-	chRcvAllTxs                    chan bool
-	onRequestTransaction           func(shardID uint32, txHashes [][]byte)
-	txsForCurrBlock                txsForBlock
-	txPool                         dataRetriever.ShardedDataCacherNotifier
-	storage                        dataRetriever.StorageService
-	txProcessor                    process.TransactionProcessor
-	orderedTxs                     map[string][]data.TransactionHandler
-	orderedTxHashes                map[string][][]byte
-	mutOrderedTxs                  sync.RWMutex
-	blockTracker                   BlockTracker
-	blockType                      block.Type
-	accountTxsShards               accountTxsShards
-	emptyAddress                   []byte
-	scheduledMiniBlocksEnableEpoch uint32
-	flagScheduledMiniBlocks        atomic.Flag
-	txTypeHandler                  process.TxTypeHandler
-	scheduledTxsExecutionHandler   process.ScheduledTxsExecutionHandler
-	transactionsMain               *preprocess.transactions
-}
-
-// ArgsTransactionPreProcessor holds the arguments to create a txs pre processor
-type ArgsTransactionPreProcessor struct {
-	TxDataPool                                  dataRetriever.ShardedDataCacherNotifier
-	Store                                       dataRetriever.StorageService
-	Hasher                                      hashing.Hasher
-	Marshalizer                                 marshal.Marshalizer
-	TxProcessor                                 process.TransactionProcessor
-	ShardCoordinator                            sharding.Coordinator
-	Accounts                                    state.AccountsAdapter
-	OnRequestTransaction                        func(shardID uint32, txHashes [][]byte)
-	EconomicsFee                                process.FeeHandler
-	GasHandler                                  process.GasHandler
-	BlockTracker                                preprocess.BlockTracker
-	BlockType                                   block.Type
-	PubkeyConverter                             core.PubkeyConverter
-	BlockSizeComputation                        preprocess.BlockSizeComputationHandler
-	BalanceComputation                          preprocess.BalanceComputationHandler
-	EpochNotifier                               process.EpochNotifier
-	OptimizeGasUsedInCrossMiniBlocksEnableEpoch uint32
-	FrontRunningProtectionEnableEpoch           uint32
-	ScheduledMiniBlocksEnableEpoch              uint32
-	TxTypeHandler                               process.TxTypeHandler
-	ScheduledTxsExecutionHandler                process.ScheduledTxsExecutionHandler
-	ProcessedMiniBlocksTracker                  process.ProcessedMiniBlocksTracker
+	transactionsMain *preprocess.transactions
 }
 
 // NewTransactionPreprocessor creates a new transaction preprocessor object
 func NewTransactionPreprocessor(
-	args ArgsTransactionPreProcessor,
+	args preprocess.ArgsTransactionPreProcessor,
 ) (*transactions, error) {
-	if check.IfNil(args.Hasher) {
-		return nil, process.ErrNilHasher
-	}
-	if check.IfNil(args.Marshalizer) {
-		return nil, process.ErrNilMarshalizer
-	}
-	if check.IfNil(args.TxDataPool) {
-		return nil, process.ErrNilTransactionPool
-	}
-	if check.IfNil(args.Store) {
-		return nil, process.ErrNilTxStorage
-	}
-	if check.IfNil(args.TxProcessor) {
-		return nil, process.ErrNilTxProcessor
-	}
-	if check.IfNil(args.ShardCoordinator) {
-		return nil, process.ErrNilShardCoordinator
-	}
-	if check.IfNil(args.Accounts) {
-		return nil, process.ErrNilAccountsAdapter
-	}
-	if args.OnRequestTransaction == nil {
-		return nil, process.ErrNilRequestHandler
-	}
-	if check.IfNil(args.EconomicsFee) {
-		return nil, process.ErrNilEconomicsFeeHandler
-	}
-	if check.IfNil(args.GasHandler) {
-		return nil, process.ErrNilGasHandler
-	}
-	if check.IfNil(args.BlockTracker) {
-		return nil, process.ErrNilBlockTracker
-	}
-	if check.IfNil(args.PubkeyConverter) {
-		return nil, process.ErrNilPubkeyConverter
-	}
-	if check.IfNil(args.BlockSizeComputation) {
-		return nil, process.ErrNilBlockSizeComputationHandler
-	}
-	if check.IfNil(args.BalanceComputation) {
-		return nil, process.ErrNilBalanceComputationHandler
-	}
-	if check.IfNil(args.EpochNotifier) {
-		return nil, process.ErrNilEpochNotifier
-	}
-	if check.IfNil(args.TxTypeHandler) {
-		return nil, process.ErrNilTxTypeHandler
-	}
-	if check.IfNil(args.ScheduledTxsExecutionHandler) {
-		return nil, process.ErrNilScheduledTxsExecutionHandler
-	}
-	if check.IfNil(args.ProcessedMiniBlocksTracker) {
-		return nil, process.ErrNilProcessedMiniBlocksTracker
-	}
-
-	bpp := basePreProcess{
-		hasher:      args.Hasher,
-		marshalizer: args.Marshalizer,
-		gasTracker: gasTracker{
-			shardCoordinator: args.ShardCoordinator,
-			gasHandler:       args.GasHandler,
-			economicsFee:     args.EconomicsFee,
-		},
-		blockSizeComputation: args.BlockSizeComputation,
-		balanceComputation:   args.BalanceComputation,
-		accounts:             args.Accounts,
-		pubkeyConverter:      args.PubkeyConverter,
-
-		optimizeGasUsedInCrossMiniBlocksEnableEpoch: args.OptimizeGasUsedInCrossMiniBlocksEnableEpoch,
-		frontRunningProtectionEnableEpoch:           args.FrontRunningProtectionEnableEpoch,
-		processedMiniBlocksTracker:                  args.ProcessedMiniBlocksTracker,
-	}
-
 	txs := &transactions{
-		basePreProcess:                 &bpp,
-		storage:                        args.Store,
-		txPool:                         args.TxDataPool,
-		onRequestTransaction:           args.OnRequestTransaction,
-		txProcessor:                    args.TxProcessor,
-		blockTracker:                   args.BlockTracker,
-		blockType:                      args.BlockType,
-		scheduledMiniBlocksEnableEpoch: args.ScheduledMiniBlocksEnableEpoch,
-		txTypeHandler:                  args.TxTypeHandler,
-		scheduledTxsExecutionHandler:   args.ScheduledTxsExecutionHandler,
+		transactionsMain: transactionsMain,
 	}
-
-	txs.chRcvAllTxs = make(chan bool)
-	txs.txPool.RegisterOnAdded(txs.receivedTransaction)
-
-	txs.txsForCurrBlock.txHashAndInfo = make(map[string]*txInfo)
-	txs.orderedTxs = make(map[string][]data.TransactionHandler)
-	txs.orderedTxHashes = make(map[string][][]byte)
-	txs.accountTxsShards.accountsInfo = make(map[string]*txShardInfo)
-
-	txs.emptyAddress = make([]byte, txs.pubkeyConverter.Len())
-
-	log.Debug("transactions: enable epoch for optimize gas used in cross shard mini blocks", "epoch", txs.optimizeGasUsedInCrossMiniBlocksEnableEpoch)
-	log.Debug("transactions: enable epoch for front running protection", "epoch", txs.frontRunningProtectionEnableEpoch)
-	log.Debug("transactions: enable epoch for scheduled mini blocks", "epoch", txs.scheduledMiniBlocksEnableEpoch)
-
-	args.EpochNotifier.RegisterNotifyHandler(txs)
 
 	return txs, nil
 }
