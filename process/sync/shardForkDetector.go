@@ -1,8 +1,10 @@
 package sync
 
 import (
+	"bytes"
 	"math"
 
+	"github.com/ElrondNetwork/elrond-go-core/core"
 	"github.com/ElrondNetwork/elrond-go-core/core/check"
 	"github.com/ElrondNetwork/elrond-go-core/data"
 	"github.com/ElrondNetwork/elrond-go/consensus"
@@ -34,7 +36,7 @@ func NewShardForkDetector(
 		return nil, process.ErrNilBlockTracker
 	}
 
-	genesisHdr, _, err := blockTracker.GetSelfNotarizedHeader(0, 0)
+	genesisHdr, _, err := blockTracker.GetSelfNotarizedHeader(core.MetachainShardId, 0)
 	if err != nil {
 		return nil, err
 	}
@@ -65,6 +67,10 @@ func NewShardForkDetector(
 		baseForkDetector: bfd,
 	}
 
+	sfd.blockTracker.RegisterSelfNotarizedFromCrossHeadersHandler(sfd.ReceivedSelfNotarizedFromCrossHeaders)
+
+	bfd.forkDetector = &sfd
+
 	return &sfd, nil
 }
 
@@ -86,16 +92,119 @@ func (sfd *shardForkDetector) AddHeader(
 	)
 }
 
-func (sfd *shardForkDetector) doJobOnBHProcessed(
-	header data.HeaderHandler,
-	headerHash []byte,
-	_ []data.HeaderHandler,
-	_ [][]byte,
+//TODO: This should be extracted from the base code as it has different logic in elrond-go vs chain-go-sdk
+//func (sfd *shardForkDetector) doJobOnBHProcessed(
+//	header data.HeaderHandler,
+//	headerHash []byte,
+//	selfNotarizedHeaders []data.HeaderHandler,
+//	selfNotarizedHeadersHashes [][]byte,
+//) {
+//	_ = sfd.appendSelfNotarizedHeaders(selfNotarizedHeaders, selfNotarizedHeadersHashes, core.MetachainShardId)
+//	sfd.computeFinalCheckpoint()
+//	sfd.addCheckpoint(&checkpointInfo{nonce: header.GetNonce(), round: header.GetRound(), hash: headerHash})
+//	sfd.removePastOrInvalidRecords()
+//}
+
+// ReceivedSelfNotarizedFromCrossHeaders is a registered call handler through which fork detector is notified
+// when metachain notarized new headers from self shard
+func (sfd *shardForkDetector) ReceivedSelfNotarizedFromCrossHeaders(
+	shardID uint32,
+	selfNotarizedHeaders []data.HeaderHandler,
+	selfNotarizedHeadersHashes [][]byte,
 ) {
-	sfd.setFinalCheckpoint(sfd.lastCheckpoint())
-	sfd.addCheckpoint(&checkpointInfo{nonce: header.GetNonce(), round: header.GetRound(), hash: headerHash})
-	sfd.removePastOrInvalidRecords()
+	// accept only self notarized headers by meta
+	if shardID != core.MetachainShardId {
+		return
+	}
+
+	appended := sfd.appendSelfNotarizedHeaders(selfNotarizedHeaders, selfNotarizedHeadersHashes, shardID)
+	if appended {
+		sfd.computeFinalCheckpoint()
+	}
+}
+
+func (sfd *shardForkDetector) appendSelfNotarizedHeaders(
+	selfNotarizedHeaders []data.HeaderHandler,
+	selfNotarizedHeadersHashes [][]byte,
+	shardID uint32,
+) bool {
+
+	selfNotarizedHeaderAdded := false
+	finalNonce := sfd.finalCheckpoint().nonce
+
+	for i := 0; i < len(selfNotarizedHeaders); i++ {
+		if selfNotarizedHeaders[i].GetNonce() <= finalNonce {
+			continue
+		}
+
+		appended := sfd.append(&headerInfo{
+			nonce: selfNotarizedHeaders[i].GetNonce(),
+			round: selfNotarizedHeaders[i].GetRound(),
+			hash:  selfNotarizedHeadersHashes[i],
+			state: process.BHNotarized,
+		})
+		if appended {
+			log.Debug("added self notarized header in fork detector",
+				"notarized by shard", shardID,
+				"round", selfNotarizedHeaders[i].GetRound(),
+				"nonce", selfNotarizedHeaders[i].GetNonce(),
+				"hash", selfNotarizedHeadersHashes[i])
+
+			selfNotarizedHeaderAdded = true
+		}
+	}
+
+	return selfNotarizedHeaderAdded
 }
 
 func (sfd *shardForkDetector) computeFinalCheckpoint() {
+	finalCheckpoint := &checkpointInfo{}
+	finalCheckpointWasSet := false
+
+	sfd.mutHeaders.RLock()
+	for nonce, headersInfo := range sfd.headers {
+		if finalCheckpoint.nonce >= nonce {
+			continue
+		}
+
+		indexBHProcessed, indexBHNotarized := sfd.getProcessedAndNotarizedIndexes(headersInfo)
+		isProcessedBlockAlreadyNotarized := indexBHProcessed != -1 && indexBHNotarized != -1
+		if !isProcessedBlockAlreadyNotarized {
+			continue
+		}
+
+		sameHash := bytes.Equal(headersInfo[indexBHNotarized].hash, headersInfo[indexBHProcessed].hash)
+		if !sameHash {
+			continue
+		}
+
+		finalCheckpoint = &checkpointInfo{
+			nonce: nonce,
+			round: headersInfo[indexBHNotarized].round,
+			hash:  headersInfo[indexBHNotarized].hash,
+		}
+
+		finalCheckpointWasSet = true
+	}
+	sfd.mutHeaders.RUnlock()
+
+	if finalCheckpointWasSet {
+		sfd.setFinalCheckpoint(finalCheckpoint)
+	}
+}
+
+func (sfd *shardForkDetector) getProcessedAndNotarizedIndexes(headersInfo []*headerInfo) (int, int) {
+	indexBHProcessed := -1
+	indexBHNotarized := -1
+
+	for index, hdrInfo := range headersInfo {
+		switch hdrInfo.state {
+		case process.BHProcessed:
+			indexBHProcessed = index
+		case process.BHNotarized:
+			indexBHNotarized = index
+		}
+	}
+
+	return indexBHProcessed, indexBHNotarized
 }

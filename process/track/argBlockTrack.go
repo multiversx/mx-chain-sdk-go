@@ -10,7 +10,7 @@ import (
 )
 
 // ArgBaseTracker holds all dependencies required by the process data factory in order to create
-// new instances of shard block tracker
+// new instances of shard/meta block tracker
 type ArgBaseTracker struct {
 	Hasher           hashing.Hasher
 	HeaderValidator  process.HeaderConstructionValidator
@@ -19,7 +19,7 @@ type ArgBaseTracker struct {
 	RoundHandler     process.RoundHandler
 	ShardCoordinator sharding.Coordinator
 	Store            dataRetriever.StorageService
-	StartHeader      data.HeaderHandler
+	StartHeaders     map[uint32]data.HeaderHandler
 	PoolsHolder      dataRetriever.PoolsHolder
 	WhitelistHandler process.WhiteListHandler
 	FeeHandler       process.FeeHandler
@@ -28,5 +28,11 @@ type ArgBaseTracker struct {
 // ArgShardTracker holds all dependencies required by the process data factory in order to create
 // new instances of shard block tracker
 type ArgShardTracker struct {
+	ArgBaseTracker
+}
+
+// ArgMetaTracker holds all dependencies required by the process data factory in order to create
+// new instances of meta block tracker
+type ArgMetaTracker struct {
 	ArgBaseTracker
 }
