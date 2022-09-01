@@ -124,10 +124,6 @@ func (bp *blockProcessor) DoJobOnReceivedHeader() {
 	bp.doJobOnReceivedHeader()
 }
 
-func (bp *blockProcessor) ComputeSelfNotarizedHeaders(headers []data.HeaderHandler) ([]data.HeaderHandler, [][]byte) {
-	return bp.computeSelfNotarizedHeaders(headers)
-}
-
 func (bp *blockProcessor) GetNextHeader(longestChainHeadersIndexes *[]int, headersIndexes []int, prevHeader data.HeaderHandler, sortedHeaders []data.HeaderHandler, index int) {
 	bp.getNextHeader(longestChainHeadersIndexes, headersIndexes, prevHeader, sortedHeaders, index)
 }

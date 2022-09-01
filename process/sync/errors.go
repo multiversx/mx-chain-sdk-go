@@ -23,9 +23,6 @@ var ErrLowerRoundInBlock = errors.New("lower round in block")
 // ErrHigherRoundInBlock signals that the round index in block is higher than the current round of chronology
 var ErrHigherRoundInBlock = errors.New("higher round in block")
 
-//ErrCorruptBootstrapFromStorageDb signals that the bootstrap database is corrupt
-var ErrCorruptBootstrapFromStorageDb = errors.New("corrupt bootstrap storage database")
-
 // ErrSignedBlock signals that a block is signed
 type ErrSignedBlock struct {
 	CurrentNonce uint64
@@ -36,14 +33,5 @@ func (err ErrSignedBlock) Error() string {
 		err.CurrentNonce)
 }
 
-// ErrRollBackBehindFinalHeader signals that a roll back behind final header has been attempted
-var ErrRollBackBehindFinalHeader = errors.New("roll back behind final header is not permitted")
-
-// ErrRollBackBehindForkNonce signals that a roll back behind fork nonce is not permitted
-var ErrRollBackBehindForkNonce = errors.New("roll back behind fork nonce is not permitted")
-
 // ErrGenesisTimeMissmatch signals that a received header has a genesis time missmatch
 var ErrGenesisTimeMissmatch = errors.New("genesis time missmatch")
-
-// ErrHeaderNotFound signals that the needed header is not found
-var ErrHeaderNotFound = errors.New("header is not found")

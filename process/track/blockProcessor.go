@@ -1,8 +1,6 @@
 package track
 
 import (
-	"sort"
-
 	"github.com/ElrondNetwork/elrond-go-core/core"
 
 	"github.com/ElrondNetwork/elrond-go-core/core/check"
@@ -84,33 +82,6 @@ func (bp *blockProcessor) doJobOnReceivedHeader() {
 	if len(selfNotarizedHeaders) > 0 {
 		bp.selfNotarizedHeadersNotifier.CallHandlers(selfNotarizedHeaders, selfNotarizedHeadersHashes)
 	}
-}
-
-func (bp *blockProcessor) computeSelfNotarizedHeaders(headers []data.HeaderHandler) ([]data.HeaderHandler, [][]byte) {
-	selfNotarizedHeadersInfo := make([]*HeaderInfo, 0)
-
-	for _, header := range headers {
-		selfHeadersInfo := bp.blockTracker.GetSelfHeaders(header)
-		if len(selfHeadersInfo) > 0 {
-			selfNotarizedHeadersInfo = append(selfNotarizedHeadersInfo, selfHeadersInfo...)
-		}
-	}
-
-	if len(selfNotarizedHeadersInfo) > 1 {
-		sort.Slice(selfNotarizedHeadersInfo, func(i, j int) bool {
-			return selfNotarizedHeadersInfo[i].Header.GetNonce() < selfNotarizedHeadersInfo[j].Header.GetNonce()
-		})
-	}
-
-	selfNotarizedHeaders := make([]data.HeaderHandler, 0)
-	selfNotarizedHeadersHashes := make([][]byte, 0)
-
-	for _, selfNotarizedHeaderInfo := range selfNotarizedHeadersInfo {
-		selfNotarizedHeaders = append(selfNotarizedHeaders, selfNotarizedHeaderInfo.Header)
-		selfNotarizedHeadersHashes = append(selfNotarizedHeadersHashes, selfNotarizedHeaderInfo.Hash)
-	}
-
-	return selfNotarizedHeaders, selfNotarizedHeadersHashes
 }
 
 // ComputeLongestChain computes the longest chain starting from a given header
