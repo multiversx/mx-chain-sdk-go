@@ -27,4 +27,5 @@ type TransactionPreprocessor interface {
 		gasBandwidth uint64,
 		randomness []byte,
 	) ([]*txcache.WrappedTransaction, []*txcache.WrappedTransaction, error)
+	CreateMarshalledData(txHashes [][]byte) ([][]byte, error)
 }

@@ -17,18 +17,21 @@ var _ process.PreProcessor = (*transactions)(nil)
 
 var log = logger.GetOrCreate("process/block/preprocess")
 
-// TODO: increase code coverage with unit test
-
 type transactions struct {
-	*preprocess.transactions
+	TransactionPreprocessor
 }
 
 // NewTransactionPreprocessor creates a new transaction preprocessor object
 func NewTransactionPreprocessor(
 	args preprocess.ArgsTransactionPreProcessor,
 ) (*transactions, error) {
+	txPreProcess, err := preprocess.NewTransactionPreprocessor(args)
+	if err != nil {
+		return nil, err
+	}
+
 	txs := &transactions{
-		preprocess.NewTransactionPreprocessor(args),
+		txPreProcess,
 	}
 
 	return txs, nil
@@ -62,7 +65,7 @@ func (txs *transactions) processTxsFromMe(
 		return false
 	}
 
-	scheduledMiniBlocks, err := txs.transactionsMain.createAndProcessScheduledMiniBlocksFromMeAsValidator(
+	scheduledMiniBlocks, err := txs.CreateAndProcessScheduledMiniBlocksFromMeAsValidator(
 		body,
 		haveTime,
 		haveAdditionalTimeFalse,
@@ -84,7 +87,7 @@ func (txs *transactions) CreateAndProcessMiniBlocks(haveTime func() bool, random
 	startTime := time.Now()
 
 	gasBandwidth := integrationTests.MaxGasLimitPerBlock
-	sortedTxs, remainingTxsForScheduled, err := txs.transactionsMain.computeSortedTxs(0, 0, gasBandwidth, randomness)
+	sortedTxs, remainingTxsForScheduled, err := txs.ComputeSortedTxs(0, 0, gasBandwidth, randomness)
 	sortedTxsForScheduled := append(sortedTxs, remainingTxsForScheduled...)
 	elapsedTime := time.Since(startTime)
 	if err != nil {
@@ -112,11 +115,11 @@ func (txs *transactions) CreateAndProcessMiniBlocks(haveTime func() bool, random
 		"time [s]", elapsedTime,
 	)
 
-	sortedTxsForScheduled, _ = txs.transactionsMain.prefilterTransactions(nil, sortedTxsForScheduled, 0, gasBandwidth)
-	txs.transactionsMain.sortTransactionsBySenderAndNonce(sortedTxsForScheduled, randomness)
+	sortedTxsForScheduled, _ = txs.PrefilterTransactions(nil, sortedTxsForScheduled, 0, gasBandwidth)
+	txs.SortTransactionsBySenderAndNonce(sortedTxsForScheduled, randomness)
 
 	haveAdditionalTime := process.HaveAdditionalTime()
-	scheduledMiniBlocks, err := txs.transactionsMain.createAndProcessScheduledMiniBlocksFromMeAsProposer(
+	scheduledMiniBlocks, err := txs.CreateAndProcessScheduledMiniBlocksFromMeAsProposer(
 		haveTime,
 		haveAdditionalTime,
 		sortedTxsForScheduled,
@@ -130,7 +133,7 @@ func (txs *transactions) CreateAndProcessMiniBlocks(haveTime func() bool, random
 	return scheduledMiniBlocks, nil
 }
 
-// ProcessMiniBlock processes all the transactions from a and saves the processed transactions in local cache complete miniblock
+// ProcessMiniBlock does nothing on sovereign chain
 func (txs *transactions) ProcessMiniBlock(
 	_ *block.MiniBlock,
 	haveTime func() bool,

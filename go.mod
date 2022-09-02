@@ -4,7 +4,7 @@ go 1.15
 
 require (
 	github.com/ElrondNetwork/arwen-wasm-vm/v1_4 v1.4.59-0.20220729115431-a6c93119bdda
-	github.com/ElrondNetwork/elrond-go v1.3.38-0.20220902131808-652ce4f77df8
+	github.com/ElrondNetwork/elrond-go v1.3.38-0.20220902200538-a479e3241204
 	github.com/ElrondNetwork/elrond-go-core v1.1.19
 	github.com/ElrondNetwork/elrond-go-crypto v1.0.1
 	github.com/ElrondNetwork/elrond-go-logger v1.0.7
