@@ -231,10 +231,8 @@ func (tpn *TestProcessorNode) initBlockProcessorWithSync() {
 		ReceiptsRepository:             &testscommon.ReceiptsRepositoryStub{},
 	}
 
-	//TODO: Replace the following line with the commented code when the elrond-go version referenced in go.mod will contain the commented methods
-	tpn.ForkDetector, _ = sync.NewShardForkDetector(tpn.RoundHandler, tpn.BlockBlackListHandler, tpn.BlockTracker, 0)
-	//forkDetector, _ := sync.NewShardForkDetector(tpn.RoundHandler, tpn.BlockBlackListHandler, tpn.BlockTracker, 0)
-	//tpn.ForkDetector, _ = sync.NewSideChainShardForkDetector(forkDetector)
+	forkDetector, _ := sync.NewShardForkDetector(tpn.RoundHandler, tpn.BlockBlackListHandler, tpn.BlockTracker, 0)
+	tpn.ForkDetector, _ = sync.NewSideChainShardForkDetector(forkDetector)
 
 	argumentsBase.ForkDetector = tpn.ForkDetector
 	argumentsBase.BlockChainHook = tpn.BlockchainHook
