@@ -231,7 +231,9 @@ func (tpn *TestProcessorNode) initBlockProcessorWithSync() {
 		ReceiptsRepository:             &testscommon.ReceiptsRepositoryStub{},
 	}
 
-	tpn.ForkDetector, _ = sync.NewShardForkDetector(tpn.RoundHandler, tpn.BlockBlackListHandler, tpn.BlockTracker, 0)
+	forkDetector, _ := sync.NewShardForkDetector(tpn.RoundHandler, tpn.BlockBlackListHandler, tpn.BlockTracker, 0)
+	tpn.ForkDetector, _ = sync.NewSideChainShardForkDetector(forkDetector)
+
 	argumentsBase.ForkDetector = tpn.ForkDetector
 	argumentsBase.BlockChainHook = tpn.BlockchainHook
 	argumentsBase.TxCoordinator = tpn.TxCoordinator

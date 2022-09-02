@@ -1321,7 +1321,8 @@ func (tpn *TestProcessorNode) getUserAccount(address []byte) (state.UserAccountH
 func (tpn *TestProcessorNode) initBlockProcessor(stateCheckpointModulus uint) {
 	var err error
 
-	tpn.ForkDetector, _ = processSync.NewShardForkDetector(tpn.RoundHandler, tpn.BlockBlackListHandler, tpn.BlockTracker, tpn.NodesSetup.GetStartTime())
+	forkDetector, _ := processSync.NewShardForkDetector(tpn.RoundHandler, tpn.BlockBlackListHandler, tpn.BlockTracker, tpn.NodesSetup.GetStartTime())
+	tpn.ForkDetector, _ = processSync.NewSideChainShardForkDetector(forkDetector)
 
 	accountsDb := make(map[state.AccountsDbIdentifier]state.AccountsAdapter)
 	accountsDb[state.UserAccountsState] = tpn.AccntState
@@ -1914,7 +1915,8 @@ func (tpn *TestProcessorNode) initBlockTracker() {
 		ArgBaseTracker: argBaseTracker,
 	}
 
-	tpn.BlockTracker, _ = track.NewShardBlockTrack(arguments)
+	blockTracker, _ := track.NewShardBlockTrack(arguments)
+	tpn.BlockTracker, _ = track.NewSideChainShardBlockTrack(blockTracker)
 }
 
 func (tpn *TestProcessorNode) initHeaderValidator() {
