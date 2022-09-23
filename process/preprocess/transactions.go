@@ -41,8 +41,7 @@ func (txs *transactions) ProcessBlockTransactions(
 	return err
 }
 
-// CreateAndProcessMiniBlocks creates miniBlocks from storage and processes the transactions added into the miniblocks
-// as long as it has time
+// CreateAndProcessMiniBlocks creates miniBlocks from selected transactions
 func (txs *transactions) CreateAndProcessMiniBlocks(haveTime func() bool, randomness []byte) (block.MiniBlockSlice, error) {
 	gasBandwidth := integrationTests.MaxGasLimitPerBlock
 	return txs.CreateScheduledMiniBlocks(haveTime, randomness, gasBandwidth)

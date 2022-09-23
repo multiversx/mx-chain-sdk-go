@@ -20,6 +20,8 @@ const (
 	keyFormat = "%s_%v"
 )
 
+var log = logger.GetOrCreate("nodesCoordinator")
+
 // ArgSingleShardNodesCoordinator holds all dependencies required by the nodes coordinator in order to create new instances
 type ArgSingleShardNodesCoordinator struct {
 	ConsensusGroupSize  int
@@ -328,7 +330,6 @@ func (i *indexHashedNodesCoordinator) selectValidators(
 	for index := range consensusGroup {
 		consensusGroup[index] = i.eligibleNodes[selectedIndexes[index]]
 	}
-	displayValidatorsForRandomness(consensusGroup, randomness)
 
 	return consensusGroup, nil
 }
