@@ -2,28 +2,29 @@ package shard
 
 import (
 	"fmt"
-	arwen14 "github.com/ElrondNetwork/arwen-wasm-vm/v1_4/arwen"
-	arwenHost14 "github.com/ElrondNetwork/arwen-wasm-vm/v1_4/arwen/host"
-	"github.com/ElrondNetwork/elrond-go-core/core"
-	"github.com/ElrondNetwork/elrond-go-core/core/check"
-	"github.com/ElrondNetwork/elrond-go-core/hashing"
-	"github.com/ElrondNetwork/elrond-go-core/marshal"
-	logger "github.com/ElrondNetwork/elrond-go-logger"
-	"github.com/ElrondNetwork/elrond-go/common/forking"
-	"github.com/ElrondNetwork/elrond-go/config"
-	"github.com/ElrondNetwork/elrond-go/process"
-	"github.com/ElrondNetwork/elrond-go/process/factory"
-	"github.com/ElrondNetwork/elrond-go/process/factory/containers"
-	"github.com/ElrondNetwork/elrond-go/process/smartContract/hooks"
-	"github.com/ElrondNetwork/elrond-go/sharding"
-	"github.com/ElrondNetwork/elrond-go/sharding/nodesCoordinator"
-	"github.com/ElrondNetwork/elrond-go/state"
-	"github.com/ElrondNetwork/elrond-go/vm"
-	systemVMFactory "github.com/ElrondNetwork/elrond-go/vm/factory"
-	systemVMProcess "github.com/ElrondNetwork/elrond-go/vm/process"
-	"github.com/ElrondNetwork/elrond-go/vm/systemSmartContracts"
-	vmcommon "github.com/ElrondNetwork/elrond-vm-common"
-	"github.com/ElrondNetwork/elrond-vm-common/parsers"
+
+	"github.com/multiversx/mx-chain-core-go/core"
+	"github.com/multiversx/mx-chain-core-go/core/check"
+	"github.com/multiversx/mx-chain-core-go/hashing"
+	"github.com/multiversx/mx-chain-core-go/marshal"
+	"github.com/multiversx/mx-chain-go/common/forking"
+	"github.com/multiversx/mx-chain-go/config"
+	"github.com/multiversx/mx-chain-go/process"
+	"github.com/multiversx/mx-chain-go/process/factory"
+	"github.com/multiversx/mx-chain-go/process/factory/containers"
+	"github.com/multiversx/mx-chain-go/process/smartContract/hooks"
+	"github.com/multiversx/mx-chain-go/sharding"
+	"github.com/multiversx/mx-chain-go/sharding/nodesCoordinator"
+	"github.com/multiversx/mx-chain-go/state"
+	"github.com/multiversx/mx-chain-go/vm"
+	systemVMFactory "github.com/multiversx/mx-chain-go/vm/factory"
+	systemVMProcess "github.com/multiversx/mx-chain-go/vm/process"
+	"github.com/multiversx/mx-chain-go/vm/systemSmartContracts"
+	logger "github.com/multiversx/mx-chain-logger-go"
+	vmcommon "github.com/multiversx/mx-chain-vm-common-go"
+	"github.com/multiversx/mx-chain-vm-common-go/parsers"
+	arwen14 "github.com/multiversx/mx-chain-vm-v1_4-go/arwen"
+	arwenHost14 "github.com/multiversx/mx-chain-vm-v1_4-go/arwen/host"
 )
 
 var _ process.VirtualMachinesContainerFactory = (*vmContainerFactory)(nil)
@@ -227,7 +228,7 @@ func (vmf *vmContainerFactory) createInProcessArwenVMV14() (vmcommon.VMExecution
 		BlockGasLimit:                       vmf.blockGasLimit,
 		GasSchedule:                         vmf.gasSchedule.LatestGasSchedule(),
 		BuiltInFuncContainer:                vmf.builtinFunctions,
-		ElrondProtectedKeyPrefix:            []byte(core.ElrondProtectedKeyPrefix),
+		ProtectedKeyPrefix:                  []byte(core.ProtectedKeyPrefix),
 		ESDTTransferParser:                  vmf.esdtTransferParser,
 		EpochNotifier:                       forking.NewGenericEpochNotifier(),
 		WasmerSIGSEGVPassthrough:            vmf.config.WasmerSIGSEGVPassthrough,

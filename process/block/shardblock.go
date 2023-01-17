@@ -5,18 +5,18 @@ import (
 	"math/big"
 	"time"
 
-	"github.com/ElrondNetwork/elrond-go-core/core"
-	"github.com/ElrondNetwork/elrond-go-core/core/check"
-	"github.com/ElrondNetwork/elrond-go-core/core/queue"
-	"github.com/ElrondNetwork/elrond-go-core/data"
-	"github.com/ElrondNetwork/elrond-go-core/data/block"
-	"github.com/ElrondNetwork/elrond-go-core/data/indexer"
-	logger "github.com/ElrondNetwork/elrond-go-logger"
-	"github.com/ElrondNetwork/elrond-go/common"
-	"github.com/ElrondNetwork/elrond-go/process"
-	"github.com/ElrondNetwork/elrond-go/process/block/bootstrapStorage"
-	"github.com/ElrondNetwork/elrond-go/process/block/processedMb"
-	"github.com/ElrondNetwork/elrond-go/state"
+	"github.com/multiversx/mx-chain-core-go/core"
+	"github.com/multiversx/mx-chain-core-go/core/check"
+	"github.com/multiversx/mx-chain-core-go/core/queue"
+	"github.com/multiversx/mx-chain-core-go/data"
+	"github.com/multiversx/mx-chain-core-go/data/block"
+	"github.com/multiversx/mx-chain-core-go/data/outport"
+	"github.com/multiversx/mx-chain-go/common"
+	"github.com/multiversx/mx-chain-go/process"
+	"github.com/multiversx/mx-chain-go/process/block/bootstrapStorage"
+	"github.com/multiversx/mx-chain-go/process/block/processedMb"
+	"github.com/multiversx/mx-chain-go/state"
+	logger "github.com/multiversx/mx-chain-logger-go"
 )
 
 var _ process.BlockProcessor = (*shardProcessor)(nil)
@@ -299,7 +299,7 @@ func (sp *shardProcessor) indexBlockIfNeeded(
 
 	log.Debug("preparing to index block", "hash", headerHash, "nonce", header.GetNonce(), "round", header.GetRound())
 
-	pool := &indexer.Pool{
+	pool := &outport.Pool{
 		Txs:      sp.txCoordinator.GetAllCurrentUsedTxs(block.TxBlock),
 		Scrs:     sp.txCoordinator.GetAllCurrentUsedTxs(block.SmartContractResultBlock),
 		Rewards:  sp.txCoordinator.GetAllCurrentUsedTxs(block.RewardsBlock),
@@ -357,12 +357,12 @@ func (sp *shardProcessor) indexBlockIfNeeded(
 	gasRefundedInHeader := sp.baseProcessor.gasConsumedProvider.TotalGasRefunded()
 	maxGasInHeader := sp.baseProcessor.economicsData.MaxGasLimitPerBlock(sp.shardCoordinator.SelfId())
 
-	args := &indexer.ArgsSaveBlockData{
+	args := &outport.ArgsSaveBlockData{
 		HeaderHash:     headerHash,
 		Body:           body,
 		Header:         header,
 		SignersIndexes: signersIndexes,
-		HeaderGasConsumption: indexer.HeaderGasConsumption{
+		HeaderGasConsumption: outport.HeaderGasConsumption{
 			GasProvided:    gasProvidedInHeader,
 			GasRefunded:    gasRefundedInHeader,
 			GasPenalized:   gasPenalizedInheader,

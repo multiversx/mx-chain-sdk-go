@@ -5,11 +5,11 @@ import (
 	"fmt"
 	"math/big"
 
-	"github.com/ElrondNetwork/elrond-go-crypto"
-	ed25519SingleSig "github.com/ElrondNetwork/elrond-go-crypto/signing/ed25519/singlesig"
-	"github.com/ElrondNetwork/elrond-go/factory/peerSignatureHandler"
-	"github.com/ElrondNetwork/elrond-go/integrationTests/mock"
-	"github.com/ElrondNetwork/elrond-go/storage/storageUnit"
+	crypto "github.com/multiversx/mx-chain-crypto-go"
+	ed25519SingleSig "github.com/multiversx/mx-chain-crypto-go/signing/ed25519/singlesig"
+	"github.com/multiversx/mx-chain-go/factory/peerSignatureHandler"
+	"github.com/multiversx/mx-chain-go/integrationTests/mock"
+	"github.com/multiversx/mx-chain-storage-go/storageUnit"
 )
 
 // TestWalletAccount creates and account with balance and crypto necessary to sign transactions
